@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ynov+</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body { 
+            background-color: #0f172a; 
+            color: #f8fafc; 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            padding: 40px; 
+            margin: 0;
+        }
+        h1 { color: #0ea5e9; }
+        p { color: #94a3b8; margin-bottom: 30px; }
+        .video-wrapper { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: #000; 
+            border: 1px solid #1e293b;
+        }
+        video { width: 100%; height: auto; }
+    </style>
+</head>
+<body>
+    <h1>Ynov+</h1>
+    <p>Lecteur HLS - Architecture K8s</p>
+    
+    <div class="video-wrapper">
+        <video id="player" controls autoplay muted></video>
+    </div>
+
+    <script>
+        const video = document.getElementById('player');
+        const videoSrc = 'http://localhost:8080/demo.m3u8';
+
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(videoSrc);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                console.log("Flux HLS chargé.");
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = videoSrc;
+        }
+    </script>
+</body>
+</html>
