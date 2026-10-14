@@ -32,6 +32,7 @@ services:
   s3storage:
     image: dxflrs/garage:v1.0.1
     container_name: ynov-s3
+    command: /garage server --single-node --default-bucket videos
     ports:
       - "3900:3900" # API S3
     volumes:
