@@ -70,7 +70,7 @@ Arcane (Dashboard) : http://localhost:3552
 
 S3 API : http://localhost:3900
 
-Notes et Galères rencontrées
+Notes et problèmes rencontrées
 
 Problème de droits avec Nginx en mode non-root :
 J'ai eu un blocage sur les images Nginx Alpine qui refusaient de démarrer à cause d'une erreur "Permission denied" sur le fichier /run/nginx.pid. L'utilisateur nginx n'ayant pas les droits d'écriture à cet emplacement par défaut. J'ai réglé le problème en ajoutant une commande sed dans les Dockerfiles (frontend et streaming) pour rediriger l'écriture du PID vers /tmp/nginx.pid directement dans le fichier de configuration global.
