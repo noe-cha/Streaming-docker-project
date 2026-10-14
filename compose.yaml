@@ -86,7 +86,7 @@ services:
       - PGID=1000
       - TZ=Europe/Paris
     volumes:
-      - jellyfin-config:/config
+      - ./jellyfin-config:/config
       - type: bind
         source: ./media
         target: /data/media
@@ -104,7 +104,6 @@ volumes:
   arcane-data:
   db-data:
   s3-data:
-  jellyfin-config:
 
 networks:
   ynov-net:
