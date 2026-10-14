@@ -61,7 +61,7 @@ git config --global user.email "ton.email@exemple.com"
 Si le depot existe deja sur GitHub/GitLab :
 
 ```bash
-git clone <URL_DE_TON_DEPOT> /Streaming-docker-project
+git clone https://github.com/noe-cha/Streaming-docker-project /Streaming-docker-project
 cd /Streaming-docker-project
 ```
 
@@ -70,7 +70,7 @@ Si tu pars d un dossier local vide et que tu veux l initialiser et le lier a un 
 ```bash
 cd /Streaming-docker-project
 git init
-git remote add origin <URL_DE_TON_DEPOT>
+git remote add origin https://github.com/noe-cha/Streaming-docker-project
 git branch -M main
 ```
 
@@ -91,11 +91,11 @@ git branch -M main
 
 3. **Acces aux interfaces** :
 
-   * **Jellyfin (Lecteur & Administration VOD)** : `http://<IP_DEBIAN>:8096`
+   * **Jellyfin (Lecteur & Administration VOD)** : `http://<IP_WAN>:8096`
 
-   * **Arcane (Dashboard de gestion)** : `http://<IP_DEBIAN>:3552`
+   * **Arcane (Dashboard de gestion)** : `http://<IP_WAN>:3552`
 
-   * **Garage S3 API** : `http://<IP_DEBIAN>:3900`
+   * **Garage S3 API** : `http://<IP_WAN>:3900`
 
 ## Notes et problemes rencontres
 
