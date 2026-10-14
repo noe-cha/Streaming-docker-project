@@ -1,12 +1,14 @@
 services:
-  portainer:
-    image: portainer/portainer-ce:latest
-    container_name: ynov-portainer
+  arcane:
+    image: ghcr.io/getarcaneapp/arcane:latest
+    container_name: ynov-arcane
     ports:
-      - "9443:9443"
+      - "3552:3552"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - portainer-data:/data
+      - arcane-data:/data
+    networks:
+      - ynov-net
     restart: always
 
   db:
@@ -38,7 +40,7 @@ services:
     environment:
       - GARAGE_CONFIG_FILE=/etc/garage.toml
     ports:
-      - "3900:3900" # API S3
+      - "3900:3900"
     networks:
       - ynov-net
     restart: unless-stopped
@@ -77,7 +79,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  portainer-data:
+  arcane-data:
   db-data:
   s3-data:
 
