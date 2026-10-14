@@ -48,6 +48,59 @@ services:
       - ynov-net
     restart: unless-stopped
 
+  rclone:
+    image: rclone/rclone:latest
+    container_name: ynov-rclone
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      # Configuration de Rclone "à la volée" sans fichier conf
+      - RCLONE_CONFIG_GARAGE_TYPE=s3
+      - RCLONE_CONFIG_GARAGE_PROVIDER=Other
+      - RCLONE_CONFIG_GARAGE_ENDPOINT=http://s3storage:3900
+      - RCLONE_CONFIG_GARAGE_ACCESS_KEY_ID=s3-admin
+      - RCLONE_CONFIG_GARAGE_SECRET_ACCESS_KEY=${S3_SECRET_KEY}
+      - RCLONE_CONFIG_GARAGE_REGION=us-east-1
+      - RCLONE_CONFIG_GARAGE_FORCE_PATH_STYLE=true
+    volumes:
+      - type: bind
+        source: ./media
+        target: /media/s3
+        bind:
+          propagation: shared
+    command: mount garage:videos /media/s3 --allow-other --vfs-cache-mode writes --poll-interval 10s
+    networks:
+      - ynov-net
+    depends_on:
+      - s3storage
+    restart: unless-stopped
+
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: ynov-jellyfin
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+    volumes:
+      - jellyfin-config:/config
+      - type: bind
+        source: ./media
+        target: /data/media
+        bind:
+          propagation: rslave
+    ports:
+      - "8096:8096"
+    networks:
+      - ynov-net
+    depends_on:
+      - rclone
+    restart: unless-stopped
+
   streaming:
     build: ./streaming
     container_name: ynov-streaming
@@ -85,6 +138,7 @@ volumes:
   arcane-data:
   db-data:
   s3-data:
+  jellyfin-config:
 
 networks:
   ynov-net:
