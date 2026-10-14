@@ -62,7 +62,7 @@ Lancer les services :
 docker compose up --build -d
 
 
-Accès aux interfaces :
+Accès aux interfaces (temporaire):
 
 Web (Player) : http://localhost:3000
 
