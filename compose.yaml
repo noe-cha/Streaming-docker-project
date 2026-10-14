@@ -1,0 +1,90 @@
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: ynov-portainer
+    ports:
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    restart: always
+
+  db:
+    image: postgres:15-alpine
+    container_name: ynov-db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - ynov-net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ynov-redis
+    networks:
+      - ynov-net
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio
+    container_name: ynov-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - ynov-net
+    restart: unless-stopped
+
+  streaming:
+    build: context: ./streaming
+    container_name: ynov-streaming
+    ports:
+      - "8080:80"
+    depends_on:
+      - minio
+    networks:
+      - ynov-net
+    restart: unless-stopped
+
+  frontend:
+    build: context: ./frontend
+    container_name: ynov-frontend
+    ports:
+      - "3000:80"
+    networks:
+      - ynov-net
+    restart: unless-stopped
+
+  worker:
+    build: context: ./worker
+    container_name: ynov-worker
+    environment:
+      - REDIS_HOST=redis
+      - MINIO_HOST=minio:9000
+      - MINIO_USER=${MINIO_ROOT_USER}
+      - MINIO_PASS=${MINIO_ROOT_PASSWORD}
+    depends_on:
+      - redis
+      - minio
+    networks:
+      - ynov-net
+    restart: unless-stopped
+
+volumes:
+  portainer-data:
+  db-data:
+  minio-data:
+
+networks:
+  ynov-net:
+    driver: bridge
