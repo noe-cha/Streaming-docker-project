@@ -18,7 +18,3 @@ Ce dépôt contient l'infrastructure de notre projet de streaming vidéo, basé 
    ```bash
    git clone [https://github.com/noe-cha/Streaming-docker-project.git](https://github.com/noe-cha/Streaming-docker-project.git)
    cd Streaming-docker-project
-=======
-# Streaming-docker-project !
-test
->>>>>>> 7140df6fb32cc8d6b0bf45ff5fa8bfa20409cef8
