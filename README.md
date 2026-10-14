@@ -1,79 +1,66 @@
 Projet de Streaming VOD
-
-Ce dépôt contient l'infrastructure d'une plateforme de streaming VOD conçue en micro-services. Le projet tourne actuellement sous Docker Compose pour faciliter le développement en local, mais l'architecture a été pensée pour être déployable sur un cluster Kubernetes (K8s) à terme.
+Ce dépôt contient l'infrastructure d'une plateforme de streaming VOD conçue en micro-services. Le projet tourne sous Docker Compose pour faciliter le déploiement, combinant une architecture de services interconnectés et l'intégration de Jellyfin adossé à un stockage objet S3 via Rclone.
 
 Architecture globale
+Voici la modélisation de l'architecture de la plateforme :
 
-Voici la modélisation de l'architecture actuelle et cible :
-
+Extrait de code
 flowchart TD
     User([Navigateur Web]) --> RP[Reverse Proxy Nginx]
     
     subgraph Docker Compose (Gestion via Arcane)
         
-        subgraph Frontend & Streaming
-            RP --> Front[Frontend Nginx :3000]
-            RP --> Stream[Streaming Nginx :8080]
-            RP --> Jelly[Jellyfin - a venir]
+        subgraph Services Médias
+            Jelly[Jellyfin :8096]
+            Rclone[Rclone / FUSE]
         end
 
         subgraph Data & Stockage
             S3[(Garage S3 :3900)]
-            DB[(PostgreSQL)]
-            Cache[(Redis)]
+            DB[(PostgreSQL :5432)]
+            Cache[(Redis :6379)]
         end
 
-        subgraph Traitement
-            Worker[Worker Python/FFmpeg]
+        subgraph Administration
+            Arcane[Arcane :3552]
         end
 
-        Front -.-> Stream
-        Stream -. lit le flux HLS .-> S3
-        Worker -. ecrit les segments .-> S3
-        Cache -. file d'attente .-> Worker
-        Worker -. met a jour .-> DB
+        Jelly -->|lit les flux| Rclone
+        Rclone -->|monte le bucket| S3
+        Jelly -. stocke config .-> Home[(Hôte /home)]
     end
-
-
 Stack Technique
+Serveur Multimédia : Jellyfin (Port 8096) pour la gestion et la lecture de la bibliothèque VOD.
 
-Frontend : Nginx (Alpine) servant une page HTML/JS simple avec hls.js.
+Pont de Stockage : Rclone assurant le montage FUSE du stockage objet S3 en tant que répertoire local (./media) avec gestion des collisions (--allow-non-empty).
 
-Streaming : Nginx configuré en reverse proxy pour distribuer les flux vidéos HLS (.m3u8 / .ts) stockés sur S3.
+Stockage Objet : Garage S3 (Port 3900) pour la conservation décentralisée des flux vidéos.
 
-Stockage : Garage S3 pour le stockage objet.
+Base de données & Cache : PostgreSQL pour les métadonnées et Redis pour la gestion des données transitoires.
 
-Base de données : PostgreSQL pour les métadonnées et Redis pour la file d'attente des tâches d'encodage.
-
-Worker : Script Python intégrant FFmpeg pour transcoder les sources en HLS.
-
-Administration : Arcane pour le monitoring et la gestion des conteneurs en local.
+Administration : Arcane (Port 3552) pour le monitoring et la supervision locale des conteneurs.
 
 Comment lancer le projet
+Initialiser la configuration d'environnement :
+Créer et configurer le fichier .env à la racine avec les identifiants requis :
 
-Initialiser la configuration :
-Il faut copier le fichier d'environnement et le remplir avec les identifiants de la base de données.
-
+Bash
 cp .env.exemple .env
-
-
 Lancer les services :
 
-docker compose up --build -d
-
-
+Bash
+docker compose up -d
 Accès aux interfaces (temporaire):
 
-Web (Player) : http://localhost:3000
+Jellyfin (Lecteur & Administration VOD) : http://<IP_DEBIAN>:8096
 
-Arcane (Dashboard) : http://localhost:3552
+Arcane (Dashboard de gestion) : http://<IP_DEBIAN>:3552
 
-S3 API : http://localhost:3900
+Garage S3 API : http://<IP_DEBIAN>:3900
 
-Notes et problèmes rencontrées
+Notes et problèmes rencontrés
+Contraintes d'espace disque sur les partitions Debian :
+L'hôte Debian présente une fragmentation des partitions avec un espace restreint sur /var, provoquant des erreurs de seuil critique (exigences de 2 Go par Jellyfin). Le problème a été résolu en déportant le volume de configuration de Jellyfin (./jellyfin-config) directement sur la partition /home (bénéficiant d'un espace de stockage confortable).
 
-Problème de droits avec Nginx en mode non-root :
-J'ai eu un blocage sur les images Nginx Alpine qui refusaient de démarrer à cause d'une erreur "Permission denied" sur le fichier /run/nginx.pid. L'utilisateur nginx n'ayant pas les droits d'écriture à cet emplacement par défaut. J'ai réglé le problème en ajoutant une commande sed dans les Dockerfiles (frontend et streaming) pour rediriger l'écriture du PID vers /tmp/nginx.pid directement dans le fichier de configuration global.
-
-Intégration de Jellyfin :
-L'objectif suivant est d'ajouter Jellyfin à la stack pour gérer la bibliothèque VOD. Le défi technique est que Jellyfin attend un stockage fichier local et ne gère pas nativement le S3. La solution prévue est de monter le bucket Garage S3 dans le conteneur Jellyfin en utilisant rclone, afin de faire le pont entre le stockage objet et le système de fichiers classique.
+Gestion des points de montage FUSE avec Rclone :
+Des conflits de verrouillage de dossiers déjà montés lors des redémarrages de conteneurs ont été neutralisés par l'intégration de l'argument --allow-non-empty dans la commande de montage Rclone.
