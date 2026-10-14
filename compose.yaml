@@ -100,39 +100,6 @@ services:
       - rclone
     restart: unless-stopped
 
-  streaming:
-    build: ./streaming
-    container_name: ynov-streaming
-    ports:
-      - "8080:80"
-    depends_on:
-      - s3storage
-    networks:
-      - ynov-net
-    restart: unless-stopped
-
-  frontend:
-    build: ./frontend
-    container_name: ynov-frontend
-    ports:
-      - "3000:80"
-    networks:
-      - ynov-net
-    restart: unless-stopped
-
-  worker:
-    build: ./worker
-    container_name: ynov-worker
-    environment:
-      - REDIS_HOST=redis
-      - S3_HOST=s3storage:3900
-    depends_on:
-      - redis
-      - s3storage
-    networks:
-      - ynov-net
-    restart: unless-stopped
-
 volumes:
   arcane-data:
   db-data:
