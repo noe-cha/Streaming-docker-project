@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Projet Ynov+ - Architecture VOD
 
 Ce dépôt contient l'infrastructure de notre projet de streaming vidéo, basé sur une architecture microservices avec Docker Compose. Le projet est conçu pour être migré sur Kubernetes par la suite.
