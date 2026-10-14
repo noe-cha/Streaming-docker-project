@@ -2,11 +2,12 @@ FROM nginx:alpine
 
 COPY index.html /usr/share/nginx/html/index.html
 
-RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx /usr/share/nginx/html
+# Créer les dossiers nécessaires et donner les droits complets à l'utilisateur nginx
+RUN mkdir -p /var/cache/nginx /var/run/nginx /var/log/nginx /usr/share/nginx/html && \
+    chown -R nginx:nginx /var/cache/nginx /var/run/nginx /var/log/nginx /usr/share/nginx/html
 
-# Configurer nginx pour écrire le pid dans un dossier accessible
-RUN sed -i 's#/var/run/nginx.pid#/tmp/nginx.pid#' /etc/nginx/nginx.conf
+# Rediriger proprement le pid vers un sous-dossier où l'utilisateur nginx a les droits
+RUN echo "pid /var/run/nginx/nginx.pid;" > /etc/nginx/conf.d/pid.conf
 
 USER nginx
 
