@@ -29,18 +29,13 @@ services:
       - ynov-net
     restart: unless-stopped
 
-  minio:
-    image: quay.io/minio/minio:latest
-    container_name: ynov-minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  s3storage:
+    image: dxflrs/garage:v1.0.1
+    container_name: ynov-s3
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "3900:3900" # API S3
     volumes:
-      - minio-data:/data
+      - s3-data:/data
     networks:
       - ynov-net
     restart: unless-stopped
@@ -51,7 +46,7 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - minio
+      - s3storage
     networks:
       - ynov-net
     restart: unless-stopped
@@ -70,12 +65,10 @@ services:
     container_name: ynov-worker
     environment:
       - REDIS_HOST=redis
-      - MINIO_HOST=minio:9000
-      - MINIO_USER=${MINIO_ROOT_USER}
-      - MINIO_PASS=${MINIO_ROOT_PASSWORD}
+      - S3_HOST=s3storage:3900
     depends_on:
       - redis
-      - minio
+      - s3storage
     networks:
       - ynov-net
     restart: unless-stopped
@@ -83,7 +76,7 @@ services:
 volumes:
   portainer-data:
   db-data:
-  minio-data:
+  s3-data:
 
 networks:
   ynov-net:

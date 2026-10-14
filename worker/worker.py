@@ -2,7 +2,7 @@ import os
 import time
 import redis
 
-print("Demarrage du worker FFmpeg...")
+print("Demarrage du worker FFmpeg (Connecte a Garage S3)...")
 
 try:
     r = redis.Redis(host=os.getenv('REDIS_HOST', 'redis'), port=6379, decode_responses=True)
