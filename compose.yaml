@@ -46,7 +46,7 @@ services:
     restart: unless-stopped
 
   streaming:
-    build: context: ./streaming
+    build: ./streaming
     container_name: ynov-streaming
     ports:
       - "8080:80"
@@ -57,7 +57,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: context: ./frontend
+    build: ./frontend
     container_name: ynov-frontend
     ports:
       - "3000:80"
@@ -66,7 +66,7 @@ services:
     restart: unless-stopped
 
   worker:
-    build: context: ./worker
+    build: ./worker
     container_name: ynov-worker
     environment:
       - REDIS_HOST=redis
