@@ -1,15 +1,18 @@
 services:
   arcane:
-    image: ghcr.io/getarcaneapp/arcane:latest
+    image: ghcr.io/getarcaneapp/manager:latest
     container_name: ynov-arcane
     ports:
       - "3552:3552"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - arcane-data:/data
+      - arcane-data:/app/data
+    environment:
+      - ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      - APP_URL=http://localhost:3552
     networks:
       - ynov-net
-    restart: always
+    restart: unless-stopped
 
   db:
     image: postgres:15-alpine
