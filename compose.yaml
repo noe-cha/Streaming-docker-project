@@ -71,7 +71,7 @@ services:
         target: /media/s3
         bind:
           propagation: shared
-    command: mount garage:videos /media/s3 --allow-other --vfs-cache-mode writes --poll-interval 10s
+    command: mount garage:videos /media/s3 --allow-other --allow-non-empty --vfs-cache-mode writes --poll-interval 10s
     networks:
       - ynov-net
     depends_on:
