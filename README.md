@@ -40,7 +40,27 @@ Base de données & Cache : PostgreSQL pour les métadonnées et Redis pour la ge
 
 Administration : Arcane (Port 3552) pour le monitoring et la supervision locale des conteneurs.
 
-Comment lancer le projet
+    Procédure de Connexion Git et Déploiement
+1. Configuration de Git sur la machine
+Si tu récupères le projet sur une nouvelle machine (ou un nouveau conteneur Proxmox), configure d'abord ton identité Git :
+
+Bash
+git config --global user.name "Ton Nom"
+git config --global user.email "ton.email@exemple.com"
+2. Clonage ou Initialisation du Dépôt
+Si le dépôt existe déjà sur GitHub/GitLab :
+
+Bash
+git clone <URL_DE_TON_DEPOT> /Streaming-docker-project
+cd /Streaming-docker-project
+Si tu pars d'un dossier local vide et que tu veux l'initialiser et le lier à un dépôt distant :
+
+Bash
+cd /Streaming-docker-project
+git init
+git remote add origin <URL_DE_TON_DEPOT>
+git branch -M main
+    Comment lancer le projet
 Initialiser la configuration d'environnement :
 Créer et configurer le fichier .env à la racine avec les identifiants requis :
 
@@ -50,7 +70,7 @@ Lancer les services :
 
 Bash
 docker compose up -d
-Accès aux interfaces (temporaire):
+Accès aux interfaces :
 
 Jellyfin (Lecteur & Administration VOD) : http://<IP_DEBIAN>:8096
 
