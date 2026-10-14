@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio
+    image: quay.io/minio/minio:latest
     container_name: ynov-minio
     command: server /data --console-address ":9001"
     environment:
