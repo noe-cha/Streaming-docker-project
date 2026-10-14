@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Projet Ynov+ - Architecture VOD
 
 Ce dépôt contient l'infrastructure de notre projet de streaming vidéo, basé sur une architecture microservices avec Docker Compose. Le projet est conçu pour être migré sur Kubernetes par la suite.
@@ -18,7 +17,3 @@ Ce dépôt contient l'infrastructure de notre projet de streaming vidéo, basé 
    ```bash
    git clone [https://github.com/noe-cha/Streaming-docker-project.git](https://github.com/noe-cha/Streaming-docker-project.git)
    cd Streaming-docker-project
-=======
-# Streaming-docker-project !
-test
->>>>>>> 7140df6fb32cc8d6b0bf45ff5fa8bfa20409cef8
