@@ -12,7 +12,7 @@ services:
       - APP_URL=http://localhost:3552
     networks:
       - ynov-net
-    restart: unless-stopped
+    restart: always
 
   db:
     image: postgres:15-alpine
@@ -25,14 +25,14 @@ services:
       - db-data:/var/lib/postgresql/data
     networks:
       - ynov-net
-    restart: unless-stopped
+    restart: always
 
   redis:
     image: redis:7-alpine
     container_name: ynov-redis
     networks:
       - ynov-net
-    restart: unless-stopped
+    restart: always
 
   s3storage:
     image: dxflrs/garage:v2.4.0
@@ -46,7 +46,7 @@ services:
       - "3900:3900"
     networks:
       - ynov-net
-    restart: unless-stopped
+    restart: always
 
   rclone:
     image: rclone/rclone:latest
@@ -76,7 +76,7 @@ services:
       - ynov-net
     depends_on:
       - s3storage
-    restart: unless-stopped
+    restart: always
 
   jellyfin:
     image: lscr.io/linuxserver/jellyfin:latest
@@ -98,7 +98,7 @@ services:
       - ynov-net
     depends_on:
       - rclone
-    restart: unless-stopped
+    restart: always
 
 volumes:
   arcane-data:
