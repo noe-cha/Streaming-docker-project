@@ -103,4 +103,4 @@ git branch -M main
   L hote Debian presente une fragmentation des partitions avec un espace restreint sur `/var`, provoquant des erreurs de seuil critique (exigences de 2 Go par Jellyfin). Le probleme a ete resolu en deportant le volume de configuration de Jellyfin (`./jellyfin-config`) directement sur la partition `/home` (beneficiant d un espace de stockage confortable).
 
 * **Gestion des points de montage FUSE avec Rclone** :
-  Des conflits de verrouillage de dossiers deja montes lors des redemarrages de conteneurs ont ete neutralises par l integration de l argument `--allow-non-empty` dans la commande de montage Rclone.
+  Des conflits de verrouillage de dossiers deja montes lors des redemarrages de conteneurs ont ete neutralises par l integration de l argument `--allow-non-empty` dans la commande de montage Rclone. .
