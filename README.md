@@ -120,6 +120,7 @@ cd /Streaming-docker-project
 - **Gestion des points de montage FUSE avec Rclone** :
   Des conflits de verrouillage de dossiers déjà montés lors des redémarrages de conteneurs ont été neutralisés par l'intégration de l'argument `--allow-non-empty` dans la commande de montage Rclone.
 
+
 ## Version Kubernetes
 
 La migration vers Kubernetes est documentée dans [`k8s/README.md`](k8s/README.md).
