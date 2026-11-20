@@ -1,0 +1,14 @@
+deployment:
+  replicas: 2
+
+service:
+  spec:
+   type: LoadBalancer
+
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+
+providers:
+  kubernetesIngress:
+    enabled: true
