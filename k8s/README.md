@@ -107,6 +107,10 @@ Variables utilisées : `source ~/tp.env` (`TRAEFIK_IP`, `LONGHORN_VERSION`…).
   `~/.kube/config`. Il faut y copier `/etc/kubernetes/admin.conf`.
 - **DNS** : un seul serveur DNS par nœud = point de défaillance. Une coupure DNS a bloqué le
   téléchargement des images Longhorn sur k8s-2 (incident du 23/11). Prévoir un DNS de secours.
+- **MetalLB et kubeadm** : kubeadm pose l'étiquette `node.kubernetes.io/exclude-from-external-load-balancers`
+  sur les control-planes. Avec 3 nœuds mixtes, plus aucun nœud n'annonçait les IP MetalLB (ARP sans réponse
+  depuis l'extérieur, alors que les tests lancés depuis un nœud passaient). Corrigé par
+  `kubectl label nodes --all node.kubernetes.io/exclude-from-external-load-balancers-`.
 - **Longhorn** : `multipathd` peut bloquer le montage des volumes. Le désactiver si le preflight le signale.
 - **YAML** : l'indentation se perd au copier-coller depuis le PDF. Toujours passer par un fichier
   du dépôt (espaces uniquement, jamais de tabulations).
