@@ -124,3 +124,7 @@ Variables utilisées : `source ~/tp.env` (`TRAEFIK_IP`, `LONGHORN_VERSION`…).
 - [ ] Migration de Garage
 - [ ] Sauvegardes et tests de panne (modules 11-12 du TP)
 - [ ] Bonus : monitoring, GitOps
+
+Résultat du test (23/11) : avant suppression, `ServerName: Jellyfin` et `StartupWizardCompleted: true`.
+Le nouveau pod (`jellyfin-64c86bcd86-7f8nt`, démarré sur k8s-1) affiche les mêmes valeurs, et le compte
+administrateur fonctionne sans repasser par l'assistant. **Checklist du bloc 2 validée.**
