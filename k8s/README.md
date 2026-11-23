@@ -128,3 +128,16 @@ Variables utilisées : `source ~/tp.env` (`TRAEFIK_IP`, `LONGHORN_VERSION`…).
 Résultat du test (23/11) : avant suppression, `ServerName: Jellyfin` et `StartupWizardCompleted: true`.
 Le nouveau pod (`jellyfin-64c86bcd86-7f8nt`, démarré sur k8s-1) affiche les mêmes valeurs, et le compte
 administrateur fonctionne sans repasser par l'assistant. **Checklist du bloc 2 validée.**
+
+## Sauvegardes (bloc 3, module 11)
+
+- **Snapshot etcd** (23/11) : `etcdctl snapshot save` sur k8s-2 (etcd 3.7.0), 21 Mo, 1031 clés,
+  vérifié avec `etcdutl snapshot status`, copié hors du nœud (empreinte SHA-256 comparée).
+  Le snapshot contient les objets Kubernetes, pas les données des volumes, ni les certificats,
+  ni la configuration des nœuds, ni les images (Q13).
+  Note : `ETCDCTL_API=3` est ignorée en etcd 3.7 (l'API v2 n'existe plus).
+- **Snapshot Longhorn** (23/11) : snapshot du volume `jellyfin-config`, création d'un fichier
+  `casse.txt`, puis retour arrière (Jellyfin arrêté avec `scale --replicas=0`, volume attaché en
+  mode maintenance, Revert depuis la frise, Detach, `scale --replicas=1`). Le fichier a disparu,
+  la configuration de Jellyfin est intacte. Un snapshot reste sur les disques du cluster : il ne
+  protège pas d'une perte totale (Q14), contrairement à un backup vers une cible externe.
