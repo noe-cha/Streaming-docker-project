@@ -9,3 +9,4 @@ kubeconfig*
 *.key
 *.pem
 *.crt
+longhornctl
