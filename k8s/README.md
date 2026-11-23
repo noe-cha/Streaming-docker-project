@@ -141,3 +141,54 @@ administrateur fonctionne sans repasser par l'assistant. **Checklist du bloc 2 v
   mode maintenance, Revert depuis la frise, Detach, `scale --replicas=1`). Le fichier a disparu,
   la configuration de Jellyfin est intacte. Un snapshot reste sur les disques du cluster : il ne
   protège pas d'une perte totale (Q14), contrairement à un backup vers une cible externe.
+
+## Tests de panne (bloc 3, module 12)
+
+Poste d'observation, hors du cluster (sur le PVE) :
+
+- `ha-probe.sh` : interroge `https://jelly.192.168.100.201.nip.io/health` chaque seconde (code HTTP + temps) ;
+- une boucle de `ping` sur la VIP de l'API (`192.168.100.10`) ;
+- pour P5, une boucle `kubectl get nodes` sur le nœud survivant (`API OK` / `API KO`).
+
+Les arrêts sont faits avec **Stop** dans Proxmox (coupure brutale, comme une panne de courant).
+
+### P1 : arrêt brutal du nœud qui héberge Jellyfin (k8s-1)
+
+État initial : Jellyfin et l'annonce MetalLB de `.201` sur k8s-1, VIP sur k8s-3.
+
+| Heure | Événement |
+|-------|-----------|
+| ~16:09 | Stop de k8s-1 : l'annonce de `.201` passe sur k8s-3 en quelques secondes |
+| ~16:09 | k8s-1 passe `NotReady` ; Traefik répond `503` (plus de pod Jellyfin prêt) |
+| 16:14:41 | Le pod est évincé (5 min plus tard), un nouveau pod est créé sur k8s-3 |
+| ~16:15 | Longhorn rattache le volume à k8s-3, Jellyfin redémarre, retour des `200` |
+
+Coupure de Jellyfin : environ 6 minutes. L'éviction n'est pas immédiate (Q15) : chaque pod tolère
+les taints `node.kubernetes.io/unreachable` et `not-ready` pendant 300 s. Kubernetes attend ce délai
+pour ne pas déplacer les pods à la moindre coupure réseau passagère, ce qui est d'autant plus
+important pour un volume RWO, qui ne peut pas être monté sur deux nœuds à la fois.
+
+### P3 : arrêt du nœud qui porte la VIP de l'API (k8s-3)
+
+VIP injoignable pendant environ **20 secondes** (17:22:35 → 17:22:55), puis reprise par un autre nœud.
+Ce délai cumule l'expiration du bail kube-vip (Lease `plndr-cp-lock`), une éventuelle élection du leader
+etcd, et la mise à jour du cache ARP via un gratuitous ARP. Pendant ce temps, `kubectl` ne répond plus,
+mais les applications ne sont pas touchées par la perte de la VIP. Jellyfin, hébergé sur k8s-3, a suivi
+la même séquence que P1.
+
+### P5 : perte du quorum etcd (k8s-2 et k8s-3 arrêtés, k8s-1 survivant)
+
+- etcd n'a plus que 1 membre sur 3 : l'API devient inutilisable (`API KO`), `kubectl` ne fonctionne plus.
+- Jellyfin répond **environ une requête sur deux** : kube-proxy sur k8s-1 continue de répartir le trafic
+  entre les deux copies de Traefik, dont celle du nœud éteint. Sans API, personne ne peut retirer
+  cette destination morte.
+- Conclusion (Q16) : sans quorum, le cluster est **figé**. Les applications déjà lancées tournent sur leur
+  configuration en mémoire, mais plus rien ne s'auto-répare (pas d'éviction, pas de recréation de pod,
+  pas de mise à jour des endpoints).
+- Au redémarrage de k8s-2, etcd retrouve 2 membres sur 3 et l'API repart **sans aucune intervention**.
+
+### Observation imprévue : après un redémarrage brutal
+
+Après un Stop puis un Start de k8s-1, le pod Jellyfin est resté en `Unknown` puis bloqué au montage :
+le pilote CSI de Longhorn (`driver.longhorn.io`) n'était pas encore enregistré sur le nœud, puis les
+volumes n'étaient pas encore rattachés. Supprimer le pod a permis à un nouveau pod de repartir proprement.
