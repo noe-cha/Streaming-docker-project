@@ -1,7 +1,6 @@
 # Déploiement Kubernetes
 
-Migration de la stack Docker (`compose.yaml`) vers un cluster Kubernetes de 3 nœuds.
-Base : TP « WordPress kubeadm », adapté au projet Jellyfin et aux versions actuelles des outils.
+Migration de la stack Docker (`compose.yaml`) vers un cluster Kubernetes de 3 nœuds pour mise en place d'une infrastructure Jellyfin.
 
 ## Architecture
 
