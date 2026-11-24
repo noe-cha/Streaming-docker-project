@@ -1,7 +1,6 @@
 # Déploiement Kubernetes
 
-Migration de la stack Docker (`compose.yaml`) vers un cluster Kubernetes de 3 nœuds.
-Base : TP « WordPress kubeadm », adapté au projet Jellyfin et aux versions actuelles des outils.
+Migration de la stack Docker (`compose.yaml`) vers un cluster Kubernetes de 3 nœuds pour mise en place d'une infrastructure Jellyfin.
 
 ## Architecture
 
@@ -127,9 +126,9 @@ Variables utilisées : `source ~/tp.env` (`TRAEFIK_IP`, `LONGHORN_VERSION`…).
 
 Résultat du test (23/11) : avant suppression, `ServerName: Jellyfin` et `StartupWizardCompleted: true`.
 Le nouveau pod (`jellyfin-64c86bcd86-7f8nt`, démarré sur k8s-1) affiche les mêmes valeurs, et le compte
-administrateur fonctionne sans repasser par l'assistant. **Checklist du bloc 2 validée.**
+administrateur fonctionne sans repasser par l'assistant. 
 
-## Sauvegardes (bloc 3, module 11)
+## Sauvegardes
 
 - **Snapshot etcd** (23/11) : `etcdctl snapshot save` sur k8s-2 (etcd 3.7.0), 21 Mo, 1031 clés,
   vérifié avec `etcdutl snapshot status`, copié hors du nœud (empreinte SHA-256 comparée).
@@ -142,8 +141,7 @@ administrateur fonctionne sans repasser par l'assistant. **Checklist du bloc 2 v
   la configuration de Jellyfin est intacte. Un snapshot reste sur les disques du cluster : il ne
   protège pas d'une perte totale (Q14), contrairement à un backup vers une cible externe.
 
-## Tests de panne (bloc 3, module 12)
-
+## Tests de panne
 Poste d'observation, hors du cluster (sur le PVE) :
 
 - `ha-probe.sh` : interroge `https://jelly.192.168.100.201.nip.io/health` chaque seconde (code HTTP + temps) ;
