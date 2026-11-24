@@ -232,11 +232,6 @@ le pilote CSI de Longhorn (`driver.longhorn.io`) n'était pas encore enregistré
 volumes n'étaient pas encore rattachés. Supprimer le pod a permis à un nouveau pod de repartir proprement.
 
 ## Reste à faire
-
-- [x] DNS de secours sur les 3 nœuds
-- [x] Config Jellyfin sur PVC Longhorn
-- [x] Déploiement de Jellyfin (1 réplica, stratégie `Recreate`) + Ingress
-- [x] Sauvegardes et tests de panne
 - [ ] Médias servis par Garage (StatefulSet) + Rclone (montage FUSE), comme dans la version Docker
 - [ ] Migration des VM vers un autre hôte Proxmox (scripts de bootstrap)
 - [ ] Bonus : monitoring, GitOps
