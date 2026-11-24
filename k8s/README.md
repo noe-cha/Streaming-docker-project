@@ -13,17 +13,32 @@ Migration de la stack Docker (`compose.yaml`) vers un cluster Kubernetes de 3 n�
 - Kubernetes v1.37.1 (kubeadm), containerd, CNI Calico
 - etcd empilé sur les 3 nœuds → tolère la perte d'un nœud (quorum 2/3)
 - Le taint `control-plane` est retiré : les applications tournent sur les 3 nœuds
+- Les 3 VM tournent sur un hôte Proxmox, sur un pont interne (`vmbr1`, `192.168.100.0/24`).
+  Le Proxmox (`192.168.100.254`) sert de passerelle et fait le NAT vers Internet.
 
 ## Adresses
 
-| Usage                        | IP / plage                        |
-|------------------------------|-----------------------------------|
-| VIP de l'API (kube-vip)      | 192.168.100.10                    |
-| Pool MetalLB                 | 192.168.100.200 - 192.168.100.220 |
-| Traefik (point d'entrée web) | 192.168.100.201                   |
+| Usage                        | IP / plage                           |
+|------------------------------|--------------------------------------|
+| VIP de l'API (kube-vip)      | 192.168.100.10                       |
+| Pool MetalLB                 | 192.168.100.200 - 192.168.100.220    |
+| Traefik (point d'entrée web) | 192.168.100.201                      |
+| Jellyfin                     | https://jelly.192.168.100.201.nip.io |
 
-Les postes clients sont sur un autre VLAN : l'accès passe par le routage inter-VLAN.
-Les noms de domaine utilisent nip.io, par exemple `jelly.192.168.100.201.nip.io`.
+Les noms de domaine utilisent nip.io (`jelly.192.168.100.201.nip.io` se résout en `192.168.100.201`).
+
+## Accès depuis un poste extérieur
+
+Le réseau des VM n'est joignable qu'à travers le Proxmox :
+
+- **SSH** : rebond par le Proxmox (`ssh -J root@<IP_PROXMOX> user@192.168.100.12`,
+  ou `ProxyJump` dans `~/.ssh/config`).
+- **Web** : tunnel SSH vers Traefik, par exemple `LocalForward 8443 192.168.100.201:443`,
+  plus une entrée `127.0.0.1 jelly.192.168.100.201.nip.io` dans `/etc/hosts`, puis
+  `https://jelly.192.168.100.201.nip.io:8443`.
+- **Interface Longhorn** (sans authentification, jamais exposée) :
+  `kubectl -n longhorn-system port-forward svc/longhorn-frontend 8080:80` sur un nœud,
+  puis tunnel SSH vers ce port.
 
 ## Composants
 
@@ -34,11 +49,11 @@ Les noms de domaine utilisent nip.io, par exemple `jelly.192.168.100.201.nip.io`
 | Traefik      | Ingress controller : routage HTTP/HTTPS par domaine, 2 réplicas    | chart 42.4.0 (v3.7) |
 | cert-manager | Génère les certificats TLS (ClusterIssuer auto-signé)              | v1.21.3             |
 | Longhorn     | Stockage persistant répliqué (StorageClass par défaut, 2 réplicas) | v1.12.2             |
-| Jellyfin     | Serveur de streaming                                               | à venir             |
+| Jellyfin     | Serveur de streaming (image linuxserver, figée par digest)         | 12.4.0              |
 
 Chemin d'une requête :
 
-    PC → routeur inter-VLAN → 192.168.100.201 (MetalLB) → Traefik (TLS) → Service → pod
+    PC → Proxmox → 192.168.100.201 (MetalLB) → Traefik (TLS) → Service jellyfin → pod Jellyfin
 
 ## Arborescence
 
@@ -47,13 +62,13 @@ Chemin d'une requête :
     ├── metallb/        pool d'IP + annonce L2
     ├── traefik/        values Helm
     ├── cert-manager/   values Helm + ClusterIssuer
-    ├── longhorn/       values Helm
+    ├── longhorn/       values Helm + test de volume RWO (test-rwo.yaml)
     ├── whoami/         test de validation Ingress + TLS (namespace demo, jetable)
-    └── jellyfin/       à venir
+    └── jellyfin/       namespace, PVC, Deployment, Service, Ingress
 
 ## Réinstallation (depuis k8s-2, utilisateur `user`)
 
-Variables utilisées : `source ~/tp.env` (`TRAEFIK_IP`, `LONGHORN_VERSION`…).
+Variables utilisées : `source ~/tp.env` (`TRAEFIK_IP`, `SHOP_DOMAIN`, `LONGHORN_VERSION`…).
 
     # MetalLB
     helm repo add metallb https://metallb.github.io/metallb
@@ -74,6 +89,11 @@ Variables utilisées : `source ~/tp.env` (`TRAEFIK_IP`, `LONGHORN_VERSION`…).
     helm install longhorn longhorn/longhorn -n longhorn-system --create-namespace \
       --version ${LONGHORN_VERSION#v} -f k8s/longhorn/longhorn-values.yaml
 
+    # Jellyfin
+    kubectl apply -f k8s/jellyfin/00-namespace.yaml
+    kubectl apply -f k8s/jellyfin/10-pvc.yaml -f k8s/jellyfin/20-deployment.yaml -f k8s/jellyfin/30-service.yaml
+    envsubst < k8s/jellyfin/40-ingress.yaml | kubectl apply -f -
+
 ## Tests de validation
 
 - **MetalLB** : un Service `LoadBalancer` reçoit une IP du pool et répond depuis le réseau.
@@ -87,14 +107,40 @@ Variables utilisées : `source ~/tp.env` (`TRAEFIK_IP`, `LONGHORN_VERSION`…).
 
   Résultat : les 3 pods répondent à tour de rôle → répartition de charge L7 + HTTPS fonctionnels.
 
-## Adaptations par rapport au TP
+- **Volume Longhorn RWO** (`k8s/longhorn/test-rwo.yaml`) : un pod écrit dans un volume, on le supprime
+  puis on le recrée : la ligne écrite par l'ancien pod est toujours là. Supprimer le PVC détruit
+  le volume (`reclaimPolicy: Delete`).
 
-| Sujet du TP                            | Adaptation                                                | Raison                                |
+## Application : Jellyfin
+
+Namespace `jellyfin`, accessible sur `https://jelly.192.168.100.201.nip.io`.
+
+Choix techniques :
+
+- **Deployment à 1 réplica, stratégie `Recreate`** : Jellyfin utilise une base SQLite, qui ne supporte
+  pas deux instances simultanées. `Recreate` arrête l'ancien pod avant de lancer le nouveau.
+- **Config sur PVC Longhorn RWO** (`jellyfin-config`, 5 Gi, 2 réplicas) : comptes, bibliothèques, base.
+- **Médias sur PVC Longhorn RWO** (`jellyfin-media`, 10 Gi) : solution provisoire. Dans la version
+  Docker, les médias sont dans Garage (S3) et montés par Rclone (FUSE) : cette intégration reste à faire.
+- **Image figée par digest** (`lscr.io/linuxserver/jellyfin@sha256:b1004…cb58`, Jellyfin 12.4.0) :
+  linuxserver ne publie pas d'étiquette `12.4.0`, et `:latest` rendrait le déploiement non reproductible
+  (`imagePullPolicy: Always`, mise à jour non maîtrisée).
+- **Probes** sur `/health` : Traefik n'envoie du trafic qu'à un Jellyfin prêt, et un Jellyfin bloqué est redémarré.
+- **Ressources** : `requests` 250m / 512 Mi, `limits` 2 CPU / 2 Gi.
+
+Test de persistance (23/11) : avant suppression du pod, `ServerName: Jellyfin` et
+`StartupWizardCompleted: true`. Le nouveau pod (`jellyfin-64c86bcd86-7f8nt`, démarré sur k8s-1) affiche
+les mêmes valeurs, et le compte administrateur fonctionne sans repasser par l'assistant.
+
+## Choix de versions et écarts aux documentations
+
+| Sujet                                  | Choix retenu                                              | Raison                                |
 |----------------------------------------|-----------------------------------------------------------|---------------------------------------|
-| ingress-nginx (envisagé)               | Traefik                                                   | ingress-nginx en fin de vie           |
+| Ingress controller                     | Traefik plutôt qu'ingress-nginx                           | ingress-nginx en fin de vie           |
 | `service.type` dans les values Traefik | Supprimé (`service.spec.type`, `LoadBalancer` par défaut) | Schéma du chart Traefik 42            |
-| `environment_check.sh` (Longhorn)      | `longhornctl check preflight`                             | Script supprimé depuis Longhorn 1.9.0 |
-| Longhorn v1.9.1                        | Longhorn v1.12.2                                          | 1.9.x ne supporte pas Kubernetes 1.37 |
+| Vérification des prérequis Longhorn    | `longhornctl check preflight`                             | `environment_check.sh` supprimé depuis Longhorn 1.9.0 |
+| Version de Longhorn                    | v1.12.2                                                   | Les versions 1.9.x ne supportent pas Kubernetes 1.37 |
+| `export ETCDCTL_API=3`                 | Inutile                                                   | Ignorée en etcd 3.7 (l'API v2 n'existe plus) |
 
 ## Points d'attention (retours d'expérience)
 
@@ -104,53 +150,47 @@ Variables utilisées : `source ~/tp.env` (`TRAEFIK_IP`, `LONGHORN_VERSION`…).
   et non sur `super-admin.conf`, qui n'existe que sur le premier nœud.
 - **kubeconfig** : l'erreur `localhost:8080 refused` veut dire que l'utilisateur courant n'a pas de
   `~/.kube/config`. Il faut y copier `/etc/kubernetes/admin.conf`.
-- **DNS** : un seul serveur DNS par nœud = point de défaillance. Une coupure DNS a bloqué le
-  téléchargement des images Longhorn sur k8s-2 (incident du 23/11). Prévoir un DNS de secours.
+- **DNS** : une coupure DNS a bloqué le téléchargement des images Longhorn sur k8s-2 (incident du 23/11).
+  Corrigé : DNS principal + secours dans `/etc/systemd/resolved.conf.d/k8s-dns.conf` sur les 3 nœuds.
 - **MetalLB et kubeadm** : kubeadm pose l'étiquette `node.kubernetes.io/exclude-from-external-load-balancers`
   sur les control-planes. Avec 3 nœuds mixtes, plus aucun nœud n'annonçait les IP MetalLB (ARP sans réponse
   depuis l'extérieur, alors que les tests lancés depuis un nœud passaient). Corrigé par
   `kubectl label nodes --all node.kubernetes.io/exclude-from-external-load-balancers-`.
 - **Longhorn** : `multipathd` peut bloquer le montage des volumes. Le désactiver si le preflight le signale.
-- **YAML** : l'indentation se perd au copier-coller depuis le PDF. Toujours passer par un fichier
-  du dépôt (espaces uniquement, jamais de tabulations).
+- **Snapshots Proxmox** : avec « Include RAM », chaque snapshot sauvegarde 14 à 16 Go par VM et prend
+  ~15 min. Une sauvegarde interrompue laisse QEMU bloqué (`savevm-end`) : il faut arrêter complètement la VM.
+  Préférer des snapshots sans RAM.
+- **kubectl delete** : pour supprimer des ressources de types différents en une commande, préfixer chaque
+  nom par son type (`kubectl delete pod/test-writer pvc/test-rwo`).
+- **YAML** : l'indentation se perd au copier-coller depuis un PDF ou une page web. Toujours passer par
+  un fichier du dépôt (espaces uniquement, jamais de tabulations).
 - **Secrets** : rien de sensible dans le dépôt (voir `.gitignore`). Les secrets iront dans des `Secret` Kubernetes.
-
-## Reste à faire
-
-- [ ] DNS de secours sur les 3 nœuds
-- [ ] Stockage des médias (volume partagé) et de la config Jellyfin
-- [ ] Déploiement de Jellyfin (1 réplica, stratégie `Recreate`) + Ingress
-- [ ] Migration de Garage
-- [ ] Sauvegardes et tests de panne (modules 11-12 du TP)
-- [ ] Bonus : monitoring, GitOps
-
-Résultat du test (23/11) : avant suppression, `ServerName: Jellyfin` et `StartupWizardCompleted: true`.
-Le nouveau pod (`jellyfin-64c86bcd86-7f8nt`, démarré sur k8s-1) affiche les mêmes valeurs, et le compte
-administrateur fonctionne sans repasser par l'assistant. 
 
 ## Sauvegardes
 
 - **Snapshot etcd** (23/11) : `etcdctl snapshot save` sur k8s-2 (etcd 3.7.0), 21 Mo, 1031 clés,
   vérifié avec `etcdutl snapshot status`, copié hors du nœud (empreinte SHA-256 comparée).
-  Le snapshot contient les objets Kubernetes, pas les données des volumes, ni les certificats,
-  ni la configuration des nœuds, ni les images (Q13).
-  Note : `ETCDCTL_API=3` est ignorée en etcd 3.7 (l'API v2 n'existe plus).
+  Le snapshot contient les objets Kubernetes, mais ni les données des volumes, ni les certificats,
+  ni la configuration des nœuds, ni les images. Un namespace témoin `marqueur-avant` a été créé
+  juste avant, pour prouver une éventuelle restauration.
 - **Snapshot Longhorn** (23/11) : snapshot du volume `jellyfin-config`, création d'un fichier
   `casse.txt`, puis retour arrière (Jellyfin arrêté avec `scale --replicas=0`, volume attaché en
   mode maintenance, Revert depuis la frise, Detach, `scale --replicas=1`). Le fichier a disparu,
   la configuration de Jellyfin est intacte. Un snapshot reste sur les disques du cluster : il ne
-  protège pas d'une perte totale (Q14), contrairement à un backup vers une cible externe.
+  protège pas d'une perte totale, contrairement à un backup vers une cible externe.
+- **Snapshots Proxmox** des 3 VM avant les tests de panne (point de retour rapide).
 
 ## Tests de panne
-Poste d'observation, hors du cluster (sur le PVE) :
+
+Poste d'observation, hors du cluster (sur le Proxmox) :
 
 - `ha-probe.sh` : interroge `https://jelly.192.168.100.201.nip.io/health` chaque seconde (code HTTP + temps) ;
 - une boucle de `ping` sur la VIP de l'API (`192.168.100.10`) ;
-- pour P5, une boucle `kubectl get nodes` sur le nœud survivant (`API OK` / `API KO`).
+- pour le test de perte du quorum, une boucle `kubectl get nodes` sur le nœud survivant (`API OK` / `API KO`).
 
 Les arrêts sont faits avec **Stop** dans Proxmox (coupure brutale, comme une panne de courant).
 
-### P1 : arrêt brutal du nœud qui héberge Jellyfin (k8s-1)
+### Arrêt brutal du nœud qui héberge Jellyfin (k8s-1)
 
 État initial : Jellyfin et l'annonce MetalLB de `.201` sur k8s-1, VIP sur k8s-3.
 
@@ -161,26 +201,26 @@ Les arrêts sont faits avec **Stop** dans Proxmox (coupure brutale, comme une pa
 | 16:14:41 | Le pod est évincé (5 min plus tard), un nouveau pod est créé sur k8s-3 |
 | ~16:15 | Longhorn rattache le volume à k8s-3, Jellyfin redémarre, retour des `200` |
 
-Coupure de Jellyfin : environ 6 minutes. L'éviction n'est pas immédiate (Q15) : chaque pod tolère
+Coupure de Jellyfin : environ 6 minutes. L'éviction n'est pas immédiate : chaque pod tolère
 les taints `node.kubernetes.io/unreachable` et `not-ready` pendant 300 s. Kubernetes attend ce délai
 pour ne pas déplacer les pods à la moindre coupure réseau passagère, ce qui est d'autant plus
 important pour un volume RWO, qui ne peut pas être monté sur deux nœuds à la fois.
 
-### P3 : arrêt du nœud qui porte la VIP de l'API (k8s-3)
+### Arrêt du nœud qui porte la VIP de l'API (k8s-3)
 
 VIP injoignable pendant environ **20 secondes** (17:22:35 → 17:22:55), puis reprise par un autre nœud.
 Ce délai cumule l'expiration du bail kube-vip (Lease `plndr-cp-lock`), une éventuelle élection du leader
 etcd, et la mise à jour du cache ARP via un gratuitous ARP. Pendant ce temps, `kubectl` ne répond plus,
 mais les applications ne sont pas touchées par la perte de la VIP. Jellyfin, hébergé sur k8s-3, a suivi
-la même séquence que P1.
+la même séquence que lors de l'arrêt de k8s-1.
 
-### P5 : perte du quorum etcd (k8s-2 et k8s-3 arrêtés, k8s-1 survivant)
+### Perte du quorum etcd (k8s-2 et k8s-3 arrêtés, k8s-1 survivant)
 
 - etcd n'a plus que 1 membre sur 3 : l'API devient inutilisable (`API KO`), `kubectl` ne fonctionne plus.
 - Jellyfin répond **environ une requête sur deux** : kube-proxy sur k8s-1 continue de répartir le trafic
   entre les deux copies de Traefik, dont celle du nœud éteint. Sans API, personne ne peut retirer
   cette destination morte.
-- Conclusion (Q16) : sans quorum, le cluster est **figé**. Les applications déjà lancées tournent sur leur
+- Conclusion : sans quorum, le cluster est **figé**. Les applications déjà lancées tournent sur leur
   configuration en mémoire, mais plus rien ne s'auto-répare (pas d'éviction, pas de recréation de pod,
   pas de mise à jour des endpoints).
 - Au redémarrage de k8s-2, etcd retrouve 2 membres sur 3 et l'API repart **sans aucune intervention**.
@@ -190,3 +230,13 @@ la même séquence que P1.
 Après un Stop puis un Start de k8s-1, le pod Jellyfin est resté en `Unknown` puis bloqué au montage :
 le pilote CSI de Longhorn (`driver.longhorn.io`) n'était pas encore enregistré sur le nœud, puis les
 volumes n'étaient pas encore rattachés. Supprimer le pod a permis à un nouveau pod de repartir proprement.
+
+## Reste à faire
+
+- [x] DNS de secours sur les 3 nœuds
+- [x] Config Jellyfin sur PVC Longhorn
+- [x] Déploiement de Jellyfin (1 réplica, stratégie `Recreate`) + Ingress
+- [x] Sauvegardes et tests de panne
+- [ ] Médias servis par Garage (StatefulSet) + Rclone (montage FUSE), comme dans la version Docker
+- [ ] Migration des VM vers un autre hôte Proxmox (scripts de bootstrap)
+- [ ] Bonus : monitoring, GitOps
