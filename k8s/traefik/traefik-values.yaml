@@ -12,3 +12,8 @@ ingressClass:
 providers:
   kubernetesIngress:
     enabled: true
+
+# IP fixe attribuée par MetalLB (sinon MetalLB prend la première libre)
+service:
+  annotations:
+    metallb.io/loadBalancerIPs: 192.168.100.201
